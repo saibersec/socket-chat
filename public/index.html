@@ -96,14 +96,28 @@ if (!username) {
 
 form.addEventListener("submit", function(e) {
   e.preventDefault();
-  if (input.value) {
-    socket.emit("chatMessage", {
-      username: username,
-      text: input.value
-    });
+  if (!input.value) return;
+
+  // COMMAND GANTI NAMA
+  if (input.value.startsWith("/name ")) {
+    const newName = input.value.replace("/name ", "").trim();
+    if (newName) {
+      username = newName;
+      localStorage.setItem("username", newName);
+      alert("Username diganti ke: " + newName);
+    }
     input.value = "";
+    return;
   }
+
+  socket.emit("chatMessage", {
+    username: username,
+    text: input.value
+  });
+
+  input.value = "";
 });
+
 
 socket.on("loadMessages", function(oldMessages) {
   oldMessages.forEach(addMessage);

@@ -1,46 +1,38 @@
 const express = require("express");
-const app = express();
 const http = require("http");
-const server = http.createServer(app);
 const { Server } = require("socket.io");
 
+const app = express();
+const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static("public"));
 
-let messages = [];
+let onlineUsers = 0;
 
 io.on("connection", (socket) => {
-  console.log("User connected");
+  onlineUsers++;
+  io.emit("onlineCount", onlineUsers);
 
-  // Kirim pesan lama ke user baru
-  socket.emit("loadMessages", messages);
-
-  // Kirim pesan baru
   socket.on("chatMessage", (data) => {
-    const messageData = {
-      id: Date.now(),
+    io.emit("chatMessage", {
       username: data.username,
-      text: data.text
-    };
-
-    messages.push(messageData);
-    io.emit("chatMessage", messageData);
+      message: data.message,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    });
   });
 
-  // Hapus pesan
-  socket.on("deleteMessage", (id) => {
-    messages = messages.filter(msg => msg.id !== id);
-    io.emit("deleteMessage", id);
+  socket.on("typing", (username) => {
+    socket.broadcast.emit("typing", username);
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected");
+    onlineUsers--;
+    io.emit("onlineCount", onlineUsers);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("Server running...");
 });

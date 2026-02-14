@@ -185,19 +185,41 @@
   });
 
   socket.on("chatMessage", (data) => {
-    const msg = document.createElement("div");
-    msg.classList.add("message");
-    msg.classList.add(data.username === username ? "me" : "other");
+  const msg = document.createElement("div");
+  msg.classList.add("message");
+  msg.classList.add(data.username === username ? "me" : "other");
 
-    msg.innerHTML = `
-      <div class="username">${data.username}</div>
-      <div>${data.message}</div>
-      <div class="time">${data.time}</div>
-    `;
+  msg.dataset.id = data.id;
 
-    chat.appendChild(msg);
-    chat.scrollTop = chat.scrollHeight;
+  msg.innerHTML = `
+    <div class="username">${data.username}</div>
+    <div>${data.message}</div>
+    <div class="time">${data.time}</div>
+  `;
+
+  let pressTimer;
+
+  msg.addEventListener("mousedown", () => {
+    pressTimer = setTimeout(() => {
+      if (confirm("Hapus pesan ini?")) {
+        socket.emit("deleteMessage", data.id);
+      }
+    }, 800);
   });
+
+  msg.addEventListener("mouseup", () => clearTimeout(pressTimer));
+  msg.addEventListener("mouseleave", () => clearTimeout(pressTimer));
+
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+});
+
+socket.on("messageDeleted", (id) => {
+  const message = document.querySelector(`[data-id='${id}']`);
+  if (message) {
+    message.remove();
+  }
+});
 
   socket.on("typing", (name) => {
     typingDiv.textContent = name + " sedang mengetik...";

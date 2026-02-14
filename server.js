@@ -13,16 +13,22 @@ let messages = [];
 io.on("connection", (socket) => {
   console.log("User connected");
 
-  socket.on("chatMessage", (msg) => {
+  // Kirim pesan lama ke user baru
+  socket.emit("loadMessages", messages);
+
+  // Kirim pesan baru
+  socket.on("chatMessage", (data) => {
     const messageData = {
       id: Date.now(),
-      text: msg
+      username: data.username,
+      text: data.text
     };
 
     messages.push(messageData);
     io.emit("chatMessage", messageData);
   });
 
+  // Hapus pesan
   socket.on("deleteMessage", (id) => {
     messages = messages.filter(msg => msg.id !== id);
     io.emit("deleteMessage", id);

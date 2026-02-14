@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Realtime Chat</title>
+<title>Private Chat</title>
 <script src="/socket.io/socket.io.js"></script>
 
 <style>
@@ -27,27 +27,22 @@ body {
 .message {
   background: #222;
   color: white;
-  padding: 20px;
+  padding: 22px;
   border-radius: 20px;
   font-size: 22px;
-  position: relative;
   word-wrap: break-word;
+  transition: 0.2s;
+}
+
+.message:active {
+  transform: scale(0.97);
 }
 
 .username {
   font-weight: bold;
   color: cyan;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
   display: block;
-}
-
-.delete-btn {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  cursor: pointer;
-  color: red;
-  font-size: 18px;
 }
 
 #form {
@@ -131,15 +126,40 @@ function addMessage(data) {
   div.innerHTML = `
     <span class="username">${data.username}</span>
     ${data.text}
-    <span class="delete-btn" onclick="deleteMsg(${data.id})">❌</span>
   `;
+
+  // LONG PRESS DELETE
+  let pressTimer;
+
+  div.addEventListener("touchstart", function() {
+    pressTimer = setTimeout(() => {
+      confirmDelete(data.id);
+    }, 600); // tahan 0.6 detik
+  });
+
+  div.addEventListener("touchend", function() {
+    clearTimeout(pressTimer);
+  });
+
+  // Desktop support
+  div.addEventListener("mousedown", function() {
+    pressTimer = setTimeout(() => {
+      confirmDelete(data.id);
+    }, 600);
+  });
+
+  div.addEventListener("mouseup", function() {
+    clearTimeout(pressTimer);
+  });
 
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 }
 
-function deleteMsg(id) {
-  socket.emit("deleteMessage", id);
+function confirmDelete(id) {
+  if (confirm("Hapus pesan ini?")) {
+    socket.emit("deleteMessage", id);
+  }
 }
 </script>
 

@@ -133,19 +133,42 @@
 
 <script>
   const socket = io();
-  const username = prompt("Masukkan username kamu:");
 
   const chat = document.getElementById("chat");
   const input = document.getElementById("messageInput");
   const typingDiv = document.getElementById("typing");
   const onlineDiv = document.getElementById("online");
 
+  // 🔥 Ambil username dari localStorage
+  let username = localStorage.getItem("username");
+
+  if (!username) {
+    username = prompt("Masukkan username kamu:");
+    if (!username || username.trim() === "") {
+      username = "User" + Math.floor(Math.random() * 1000);
+    }
+    localStorage.setItem("username", username);
+  }
+
   function sendMessage() {
-    if (input.value.trim() === "") return;
+    const text = input.value.trim();
+    if (text === "") return;
+
+    // 🔥 COMMAND GANTI NAMA
+    if (text.startsWith("/name ")) {
+      const newName = text.replace("/name ", "").trim();
+      if (newName !== "") {
+        username = newName;
+        localStorage.setItem("username", username);
+        alert("Username berhasil diganti jadi: " + username);
+      }
+      input.value = "";
+      return;
+    }
 
     socket.emit("chatMessage", {
       username: username,
-      message: input.value
+      message: text
     });
 
     input.value = "";
@@ -153,6 +176,12 @@
 
   input.addEventListener("input", () => {
     socket.emit("typing", username);
+  });
+
+  input.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
   });
 
   socket.on("chatMessage", (data) => {
@@ -178,7 +207,30 @@
   socket.on("onlineCount", (count) => {
     onlineDiv.textContent = "Online: " + count;
   });
+
+  // 🔥 LOAD SEMUA PESAN LAMA SAAT MASUK
+socket.on("loadMessages", (messages) => {
+  chat.innerHTML = "";
+
+  messages.forEach(data => {
+    const msg = document.createElement("div");
+    msg.classList.add("message");
+    msg.classList.add(data.username === username ? "me" : "other");
+
+    msg.innerHTML = `
+      <div class="username">${data.username}</div>
+      <div>${data.message}</div>
+      <div class="time">${data.time}</div>
+    `;
+
+    chat.appendChild(msg);
+  });
+
+  chat.scrollTop = chat.scrollHeight;
+});
+
 </script>
+
 
 </body>
 </html>

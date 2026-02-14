@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -8,27 +9,46 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
+const FILE = "messages.json";
+
+// 🔥 Pastikan file ada
+if (!fs.existsSync(FILE)) {
+  fs.writeFileSync(FILE, "[]");
+}
+
+// 🔥 Load pesan dari file
+let messages = JSON.parse(fs.readFileSync(FILE));
+
 let onlineUsers = 0;
 
 io.on("connection", (socket) => {
   onlineUsers++;
   io.emit("onlineCount", onlineUsers);
 
+  // kirim semua pesan lama ke user baru
+  socket.emit("loadMessages", messages);
+
   socket.on("chatMessage", (data) => {
-  io.emit("chatMessage", {
-    username: data.username,
-    message: data.message,
-    time: new Date().toLocaleTimeString("id-ID", {
+
+    const time = new Date().toLocaleTimeString("id-ID", {
       timeZone: "Asia/Jakarta",
       hour: "2-digit",
       minute: "2-digit"
-    })
-  });
-});
+    });
 
+    const newMessage = {
+      id: Date.now(),
+      username: data.username,
+      message: data.message,
+      time: time
+    };
 
-  socket.on("typing", (username) => {
-    socket.broadcast.emit("typing", username);
+    messages.push(newMessage);
+
+    // 🔥 Simpan ke file
+    fs.writeFileSync(FILE, JSON.stringify(messages, null, 2));
+
+    io.emit("chatMessage", newMessage);
   });
 
   socket.on("disconnect", () => {

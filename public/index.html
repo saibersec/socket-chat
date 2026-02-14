@@ -1,141 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Socket Realtime Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Realtime Chat</title>
   <script src="/socket.io/socket.io.js"></script>
+
   <style>
     body {
-      font-family: Arial;
-      background: #ece5dd;
-      display: flex;
-      justify-content: center;
-      margin-top: 40px;
-    }
-
-    .chat-container {
-      width: 400px;
-      background: white;
-      border-radius: 10px;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
       display: flex;
       flex-direction: column;
-      height: 600px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+      height: 100vh;
     }
 
-    .header {
-      background: #075e54;
-      color: white;
-      padding: 15px;
-      text-align: center;
-      font-weight: bold;
-    }
-
-    .chat-box {
+    #messages {
       flex: 1;
-      padding: 10px;
       overflow-y: auto;
+      padding: 20px;
       display: flex;
       flex-direction: column;
+      gap: 15px;
     }
 
     .message {
-      padding: 8px 12px;
-      margin: 5px 0;
-      border-radius: 15px;
-      max-width: 70%;
-      font-size: 14px;
-    }
-
-    .me {
-      background: #dcf8c6;
-      align-self: flex-end;
-    }
-
-    .other {
-      background: #f1f0f0;
-      align-self: flex-start;
-    }
-
-    .input-area {
-      display: flex;
-      padding: 10px;
-      border-top: 1px solid #ddd;
-    }
-
-    .input-area input {
-      flex: 1;
-      padding: 8px;
-      border-radius: 20px;
-      border: 1px solid #ccc;
-      outline: none;
-    }
-
-    .input-area button {
-      margin-left: 8px;
-      padding: 8px 15px;
-      border: none;
-      border-radius: 20px;
-      background: #075e54;
+      background: #222;
       color: white;
+      padding: 20px;
+      border-radius: 20px;
+      font-size: 22px;   /* BESAR */
+      position: relative;
+      word-wrap: break-word;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 5px;
+      right: 10px;
       cursor: pointer;
+      color: red;
+      font-size: 18px;
+    }
+
+    #form {
+      display: flex;
+      padding: 15px;
+      background: #000;
+    }
+
+    #input {
+      flex: 1;
+      padding: 20px;
+      font-size: 22px;   /* BESAR */
+      border-radius: 15px;
+      border: none;
+    }
+
+    button {
+      padding: 20px;
+      font-size: 22px;
+      margin-left: 10px;
+      border-radius: 15px;
+      border: none;
+      background: limegreen;
+      color: white;
     }
   </style>
 </head>
+
 <body>
 
-<div class="chat-container">
-  <div class="header">🔥 Socket Realtime Chat</div>
+  <div id="messages"></div>
 
-  <div style="padding:10px;">
-    <input id="username" placeholder="Masukkan username">
-  </div>
-
-  <div class="chat-box" id="chatBox"></div>
-
-  <div class="input-area">
-    <input id="message" placeholder="Tulis pesan...">
-    <button onclick="sendMessage()">Send</button>
-  </div>
-</div>
+  <form id="form">
+    <input id="input" autocomplete="off" placeholder="Tulis pesan..." />
+    <button>Kirim</button>
+  </form>
 
 <script>
   const socket = io();
-  const chatBox = document.getElementById("chatBox");
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const messages = document.getElementById("messages");
 
-  function sendMessage() {
-    const username = document.getElementById("username").value;
-    const message = document.getElementById("message").value;
-
-    if (!username || !message) {
-      alert("Isi username dan pesan!");
-      return;
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    if (input.value) {
+      socket.emit("chatMessage", input.value);
+      input.value = "";
     }
+  });
 
-    socket.emit("sendMessage", {
-      username,
-      message
-    });
-
-    document.getElementById("message").value = "";
-  }
-
-  socket.on("receiveMessage", (data) => {
-    const currentUser = document.getElementById("username").value;
-
+  socket.on("chatMessage", function(data) {
     const div = document.createElement("div");
     div.classList.add("message");
+    div.setAttribute("data-id", data.id);
 
-    if (data.username === currentUser) {
-      div.classList.add("me");
-    } else {
-      div.classList.add("other");
-    }
+    div.innerHTML = `
+      ${data.text}
+      <span class="delete-btn" onclick="deleteMsg(${data.id})">❌</span>
+    `;
 
-    div.textContent = data.username + ": " + data.message;
-
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
   });
+
+  socket.on("deleteMessage", function(id) {
+    const msg = document.querySelector(`[data-id='${id}']`);
+    if (msg) msg.remove();
+  });
+
+  function deleteMsg(id) {
+    socket.emit("deleteMessage", id);
+  }
 </script>
 
 </body>

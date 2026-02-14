@@ -1,27 +1,20 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.static("public"));
+let messages = [];
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
 
-  socket.on("sendMessage", (data) => {
-    io.emit("receiveMessage", data); // broadcast ke semua user
+  socket.on("chatMessage", (msg) => {
+    const messageData = {
+      id: Date.now(),
+      text: msg
+    };
+
+    messages.push(messageData);
+    io.emit("chatMessage", messageData);
   });
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+  socket.on("deleteMessage", (id) => {
+    messages = messages.filter(msg => msg.id !== id);
+    io.emit("deleteMessage", id);
   });
-});
 
-const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-  console.log("Server running on port", PORT);
 });

@@ -133,6 +133,13 @@
 
 <script>
 
+  const access = sessionStorage.getItem("chat_access");
+
+if (access !== "ghcxvmuvvyvysjvhevdhvhvdhcyryvhsjs32jbjjb1") {
+  document.body.innerHTML = "<h2>Akses ditolak</h2>";
+}
+
+
   // 🔥 CEK AKSES
 const params = new URLSearchParams(window.location.search);
 const key = params.get("key");

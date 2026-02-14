@@ -15,12 +15,17 @@ io.on("connection", (socket) => {
   io.emit("onlineCount", onlineUsers);
 
   socket.on("chatMessage", (data) => {
-    io.emit("chatMessage", {
-      username: data.username,
-      message: data.message,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    });
+  io.emit("chatMessage", {
+    username: data.username,
+    message: data.message,
+    time: new Date().toLocaleTimeString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit"
+    })
   });
+});
+
 
   socket.on("typing", (username) => {
     socket.broadcast.emit("typing", username);

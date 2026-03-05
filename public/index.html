@@ -1,42 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Realtime Chat</title>
-  <script src="/socket.io/socket.io.js"></script>
-  <style>
-    
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #0f0f0f, #1a1a1a);
-      color: white;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realtime Chat</title>
+<script src="/socket.io/socket.io.js"></script>
 
-    header {
-      padding: 15px;
-      background: #111;
-      border-bottom: 1px solid #333;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #0f0f0f, #1a1a1a);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
 
-    #online {
-      font-size: 14px;
-      color: #aaa;
-    }
+header {
+  padding: 15px;
+  background: #111;
+  border-bottom: 1px solid #333;
+}
 
-    #chat {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-    }
+#online {
+  font-size: 14px;
+  color: #aaa;
+}
 
-    .message {
+#chat {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
   max-width: 85%;
   padding: 14px 18px;
   margin: 8px 0;
@@ -44,48 +43,46 @@
   font-size: 17px;
   line-height: 1.4;
   animation: fadeIn 0.3s ease;
+  transition: 0.2s;
 }
 
+.me {
+  align-self: flex-end;
+  background: #3b82f6;
+}
 
-    .me {
-      align-self: flex-end;
-      background: #3b82f6;
-    }
+.other {
+  align-self: flex-start;
+  background: #333;
+}
 
-    .other {
-      align-self: flex-start;
-      background: #333;
-    }
-
-    .username {
+.username {
   font-size: 13px;
   font-weight: bold;
   margin-bottom: 6px;
 }
 
-
-    .time {
+.time {
   font-size: 11px;
   opacity: 0.7;
   margin-top: 6px;
 }
 
+#typing {
+  font-size: 12px;
+  color: #aaa;
+  padding-left: 20px;
+  height: 20px;
+}
 
-    #typing {
-      font-size: 12px;
-      color: #aaa;
-      padding-left: 20px;
-      height: 20px;
-    }
+#inputArea {
+  display: flex;
+  padding: 15px;
+  background: #111;
+  border-top: 1px solid #333;
+}
 
-    #inputArea {
-      display: flex;
-      padding: 15px;
-      background: #111;
-      border-top: 1px solid #333;
-    }
-
-    input {
+input {
   flex: 1;
   padding: 18px;
   border-radius: 12px;
@@ -93,8 +90,7 @@
   font-size: 17px;
 }
 
-
-    button {
+button {
   padding: 18px 22px;
   margin-left: 10px;
   border-radius: 12px;
@@ -105,17 +101,17 @@
   cursor: pointer;
 }
 
+button:hover {
+  background: #2563eb;
+}
 
-    button:hover {
-      background: #2563eb;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
 </head>
+
 <body>
 
 <header>
@@ -133,9 +129,7 @@
 
 <script>
 
-  
-
-  // 🔥 CEK AKSES
+// 🔥 CEK AKSES
 const params = new URLSearchParams(window.location.search);
 const key = params.get("key");
 
@@ -144,68 +138,91 @@ if (key !== "ghcxvmuvvyvysjvhevdhvhvdhcyryvhsjs32jbjjb1") {
   throw new Error("Unauthorized");
 }
 
-  const socket = io();
+const socket = io();
 
-  const chat = document.getElementById("chat");
-  const input = document.getElementById("messageInput");
-  const typingDiv = document.getElementById("typing");
-  const onlineDiv = document.getElementById("online");
+const chat = document.getElementById("chat");
+const input = document.getElementById("messageInput");
+const typingDiv = document.getElementById("typing");
+const onlineDiv = document.getElementById("online");
 
-  // 🔥 Ambil username dari localStorage
-  let username = localStorage.getItem("username");
+let username = localStorage.getItem("username");
 
-  if (!username) {
-    username = prompt("Masukkan username kamu:");
-    if (!username || username.trim() === "") {
-      username = "User" + Math.floor(Math.random() * 1000);
-    }
-    localStorage.setItem("username", username);
+if (!username) {
+  username = prompt("Masukkan username kamu:");
+  if (!username || username.trim() === "") {
+    username = "User" + Math.floor(Math.random() * 1000);
   }
+  localStorage.setItem("username", username);
+}
 
-  function sendMessage() {
-    const text = input.value.trim();
-    if (text === "") return;
+// 🔥 REGISTER USER KE SERVER
+socket.emit("registerUser", username);
 
-    // 🔥 COMMAND GANTI NAMA
-    if (text.startsWith("/name ")) {
-      const newName = text.replace("/name ", "").trim();
-      if (newName !== "") {
-        username = newName;
-        localStorage.setItem("username", username);
-        alert("Username berhasil diganti jadi: " + username);
-      }
-      input.value = "";
-      return;
+function sendMessage() {
+  const text = input.value.trim();
+  if (text === "") return;
+
+  if (text.startsWith("/name ")) {
+    const newName = text.replace("/name ", "").trim();
+    if (newName !== "") {
+      username = newName;
+      localStorage.setItem("username", username);
+      socket.emit("registerUser", username);
+      alert("Username diganti jadi: " + username);
     }
-
-    socket.emit("chatMessage", {
-      username: username,
-      message: text
-    });
-
     input.value = "";
+    return;
   }
 
-  input.addEventListener("input", () => {
-    socket.emit("typing", username);
+  socket.emit("chatMessage", {
+    username: username,
+    message: text
   });
 
-  input.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") {
-      sendMessage();
-    }
-  });
+  input.value = "";
+}
 
-  socket.on("chatMessage", (data) => {
+// 🔥 TYPING SMOOTH
+let typingTimeout;
+
+input.addEventListener("input", () => {
+  socket.emit("typing", username);
+
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    socket.emit("stopTyping");
+  }, 1500);
+});
+
+input.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendMessage();
+});
+
+// 🔥 TERIMA PESAN
+socket.on("chatMessage", (data) => {
+
   const msg = document.createElement("div");
   msg.classList.add("message");
   msg.classList.add(data.username === username ? "me" : "other");
-
   msg.dataset.id = data.id;
+
+  let messageText = data.message;
+
+  // 🔥 Highlight kalau kamu di-tag
+  if (messageText.includes("@" + username)) {
+    msg.style.border = "2px solid #3b82f6";
+    msg.style.boxShadow = "0 0 15px #3b82f6";
+  }
+
+  // 🔥 Highlight teks mention
+  messageText = messageText.replace(
+    new RegExp("@" + username, "g"),
+    `<span style="color:#3b82f6;font-weight:bold">@${username}</span>`
+  );
 
   msg.innerHTML = `
     <div class="username">${data.username}</div>
-    <div>${data.message}</div>
+    <div>${messageText}</div>
     <div class="time">${data.time}</div>
   `;
 
@@ -226,23 +243,27 @@ if (key !== "ghcxvmuvvyvysjvhevdhvhvdhcyryvhsjs32jbjjb1") {
   chat.scrollTop = chat.scrollHeight;
 });
 
+// 🔥 DELETE MESSAGE
 socket.on("messageDeleted", (id) => {
   const message = document.querySelector(`[data-id='${id}']`);
-  if (message) {
-    message.remove();
-  }
+  if (message) message.remove();
 });
 
-  socket.on("typing", (name) => {
-    typingDiv.textContent = name + " sedang mengetik...";
-    setTimeout(() => typingDiv.textContent = "", 1500);
-  });
+// 🔥 TYPING EVENT
+socket.on("typing", (name) => {
+  typingDiv.textContent = name + " sedang mengetik...";
+});
 
-  socket.on("onlineCount", (count) => {
-    onlineDiv.textContent = "Online: " + count;
-  });
+socket.on("stopTyping", () => {
+  typingDiv.textContent = "";
+});
 
-  // 🔥 LOAD SEMUA PESAN LAMA SAAT MASUK
+// 🔥 ONLINE COUNT
+socket.on("onlineCount", (count) => {
+  onlineDiv.textContent = "Online: " + count;
+});
+
+// 🔥 LOAD HISTORY
 socket.on("loadMessages", (messages) => {
   chat.innerHTML = "";
 
@@ -263,8 +284,15 @@ socket.on("loadMessages", (messages) => {
   chat.scrollTop = chat.scrollHeight;
 });
 
-</script>
+// 🔥 NOTIF MENTION
+socket.on("mentioned", (data) => {
+  alert("Kamu di-tag oleh " + data.from + " 🔔");
 
+  const audio = new Audio("https://www.myinstants.com/media/sounds/notification.mp3");
+  audio.play();
+});
+
+</script>
 
 </body>
 </html>

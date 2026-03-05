@@ -21,6 +21,10 @@ let messages = JSON.parse(fs.readFileSync(FILE));
 
 let onlineUsers = 0;
 
+// 🔥 Simpan user yang aktif
+let connectedUsers = {}; 
+// format: { socketId: username }
+
 io.on("connection", (socket) => {
 
   onlineUsers++;
@@ -28,7 +32,28 @@ io.on("connection", (socket) => {
 
   socket.emit("loadMessages", messages);
 
-  // 🔥 SAAT ADA PESAN BARU
+  // ===============================
+  // 🔥 REGISTER USERNAME
+  // ===============================
+  socket.on("registerUser", (username) => {
+    connectedUsers[socket.id] = username;
+    socket.username = username;
+  });
+
+  // ===============================
+  // 🔥 TYPING
+  // ===============================
+  socket.on("typing", (name) => {
+    socket.broadcast.emit("typing", name);
+  });
+
+  socket.on("stopTyping", () => {
+    socket.broadcast.emit("stopTyping");
+  });
+
+  // ===============================
+  // 🔥 CHAT MESSAGE
+  // ===============================
   socket.on("chatMessage", (data) => {
 
     const time = new Date().toLocaleTimeString("id-ID", {
@@ -48,9 +73,31 @@ io.on("connection", (socket) => {
     fs.writeFileSync(FILE, JSON.stringify(messages, null, 2));
 
     io.emit("chatMessage", newMessage);
+
+    // ===============================
+    // 🔥 CEK MENTION @username
+    // ===============================
+    const words = data.message.split(" ");
+
+    words.forEach(word => {
+      if (word.startsWith("@")) {
+        const mentionedName = word.substring(1);
+
+        for (let id in connectedUsers) {
+          if (connectedUsers[id] === mentionedName) {
+            io.to(id).emit("mentioned", {
+              from: data.username
+            });
+          }
+        }
+      }
+    });
+
   });
 
-  // 🔥 TARUH DI SINI (DI BAWAH chatMessage)
+  // ===============================
+  // 🔥 DELETE MESSAGE
+  // ===============================
   socket.on("deleteMessage", (id) => {
 
     messages = messages.filter(msg => msg.id !== id);
@@ -60,7 +107,13 @@ io.on("connection", (socket) => {
     io.emit("messageDeleted", id);
   });
 
+  // ===============================
+  // 🔥 DISCONNECT
+  // ===============================
   socket.on("disconnect", () => {
+
+    delete connectedUsers[socket.id];
+
     onlineUsers--;
     io.emit("onlineCount", onlineUsers);
   });

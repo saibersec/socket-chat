@@ -57,6 +57,11 @@ io.on("connection", (socket) => {
     socket.username = username;
   });
 
+  socket.on("registerUser", (username) => {
+  connectedUsers[socket.id] = username;
+  console.log("REGISTER:", username);
+});
+
   // ===============================
   // 🔥 TYPING
   // ===============================
@@ -109,6 +114,9 @@ io.on("connection", (socket) => {
             });
           }
         }
+
+        console.log("CONNECTED USERS:", connectedUsers);
+console.log("MENTIONED:", mentionedName);
 
         // 🔹 Notif Telegram (walau web tutup)
         if (telegramUsers[mentionedName]) {

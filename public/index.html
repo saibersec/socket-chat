@@ -33,6 +33,7 @@ header {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  scroll-behavior: smooth;
 }
 
 .message {
@@ -44,6 +45,7 @@ header {
   line-height: 1.4;
   animation: fadeIn 0.3s ease;
   transition: 0.2s;
+  word-wrap: break-word;
 }
 
 .me {
@@ -105,6 +107,20 @@ button:hover {
   background: #2563eb;
 }
 
+#toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: #3b82f6;
+  color: white;
+  padding: 14px 20px;
+  border-radius: 12px;
+  display: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  font-size: 14px;
+  z-index: 9999;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -127,9 +143,9 @@ button:hover {
   <button onclick="sendMessage()">Kirim</button>
 </div>
 
-<script>
+<div id="toast"></div>
 
-// 🔥 CEK AKSES
+<script>
 const params = new URLSearchParams(window.location.search);
 const key = params.get("key");
 
@@ -155,24 +171,32 @@ if (!username) {
   localStorage.setItem("username", username);
 }
 
-// 🔥 REGISTER USER KE SERVER
 socket.emit("registerUser", username);
+
+// 🔥 REGISTER TELEGRAM CHAT ID (jika ada)
+const chatId = localStorage.getItem("telegramChatId");
+if (chatId) {
+  socket.emit("registerTelegram", {
+    username: username,
+    chatId: chatId
+  });
+}
+
+function escapeHTML(text) {
+  return text.replace(/[&<>"']/g, function(m) {
+    return ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    })[m];
+  });
+}
 
 function sendMessage() {
   const text = input.value.trim();
   if (text === "") return;
-
-  if (text.startsWith("/name ")) {
-    const newName = text.replace("/name ", "").trim();
-    if (newName !== "") {
-      username = newName;
-      localStorage.setItem("username", username);
-      socket.emit("registerUser", username);
-      alert("Username diganti jadi: " + username);
-    }
-    input.value = "";
-    return;
-  }
 
   socket.emit("chatMessage", {
     username: username,
@@ -182,7 +206,6 @@ function sendMessage() {
   input.value = "";
 }
 
-// 🔥 TYPING SMOOTH
 let typingTimeout;
 
 input.addEventListener("input", () => {
@@ -198,58 +221,46 @@ input.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 
-// 🔥 TERIMA PESAN
-socket.on("chatMessage", (data) => {
-
+function renderMessage(data) {
   const msg = document.createElement("div");
   msg.classList.add("message");
   msg.classList.add(data.username === username ? "me" : "other");
   msg.dataset.id = data.id;
 
-  let messageText = data.message;
+  let messageText = escapeHTML(data.message);
 
-  // 🔥 Highlight kalau kamu di-tag
   if (messageText.includes("@" + username)) {
     msg.style.border = "2px solid #3b82f6";
     msg.style.boxShadow = "0 0 15px #3b82f6";
   }
 
-  // 🔥 Highlight teks mention
   messageText = messageText.replace(
     new RegExp("@" + username, "g"),
     `<span style="color:#3b82f6;font-weight:bold">@${username}</span>`
   );
 
   msg.innerHTML = `
-    <div class="username">${data.username}</div>
+    <div class="username">${escapeHTML(data.username)}</div>
     <div>${messageText}</div>
     <div class="time">${data.time}</div>
   `;
 
-  let pressTimer;
-
-  msg.addEventListener("mousedown", () => {
-    pressTimer = setTimeout(() => {
-      if (confirm("Hapus pesan ini?")) {
-        socket.emit("deleteMessage", data.id);
-      }
-    }, 800);
-  });
-
-  msg.addEventListener("mouseup", () => clearTimeout(pressTimer));
-  msg.addEventListener("mouseleave", () => clearTimeout(pressTimer));
-
   chat.appendChild(msg);
   chat.scrollTop = chat.scrollHeight;
+}
+
+socket.on("chatMessage", renderMessage);
+
+socket.on("loadMessages", (messages) => {
+  chat.innerHTML = "";
+  messages.forEach(renderMessage);
 });
 
-// 🔥 DELETE MESSAGE
 socket.on("messageDeleted", (id) => {
   const message = document.querySelector(`[data-id='${id}']`);
   if (message) message.remove();
 });
 
-// 🔥 TYPING EVENT
 socket.on("typing", (name) => {
   typingDiv.textContent = name + " sedang mengetik...";
 });
@@ -258,40 +269,27 @@ socket.on("stopTyping", () => {
   typingDiv.textContent = "";
 });
 
-// 🔥 ONLINE COUNT
 socket.on("onlineCount", (count) => {
   onlineDiv.textContent = "Online: " + count;
 });
 
-// 🔥 LOAD HISTORY
-socket.on("loadMessages", (messages) => {
-  chat.innerHTML = "";
+function showToast(text) {
+  const toast = document.getElementById("toast");
+  toast.textContent = text;
+  toast.style.display = "block";
 
-  messages.forEach(data => {
-    const msg = document.createElement("div");
-    msg.classList.add("message");
-    msg.classList.add(data.username === username ? "me" : "other");
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 3000);
+}
 
-    msg.innerHTML = `
-      <div class="username">${data.username}</div>
-      <div>${data.message}</div>
-      <div class="time">${data.time}</div>
-    `;
-
-    chat.appendChild(msg);
-  });
-
-  chat.scrollTop = chat.scrollHeight;
-});
-
-// 🔥 NOTIF MENTION
 socket.on("mentioned", (data) => {
-  alert("Kamu di-tag oleh " + data.from + " 🔔");
+  showToast("Kamu di-tag oleh " + data.from + " 🔔");
 
-  const audio = new Audio("https://www.myinstants.com/media/sounds/notification.mp3");
+  const audio = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3");
+  audio.volume = 0.3;
   audio.play();
 });
-
 </script>
 
 </body>

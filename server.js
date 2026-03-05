@@ -1,11 +1,10 @@
 const axios = require("axios");
-
-const TELEGRAM_TOKEN = "ISI_TOKEN_BARU_KAMU_DISINI";
-
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const fs = require("fs");
+
+const TELEGRAM_TOKEN = "8676341356:AAE56RWUo-RzO12BmlKh7Klyg7YkpnGxy9U";
 
 const app = express();
 const server = http.createServer(app);
@@ -29,21 +28,11 @@ let onlineUsers = 0;
 // { socketId: username }
 let connectedUsers = {};
 
-// { username: chatId }
+// { usernameLowercase: chatId }
 let telegramUsers = {};
 
 io.on("connection", (socket) => {
 
-  // ===============================
-  // 🔥 REGISTER TELEGRAM CHAT ID
-  // ===============================
-  socket.on("registerTelegram", (data) => {
-    telegramUsers[data.username] = data.chatId;
-  });
-
-  // ===============================
-  // 🔥 ONLINE COUNTER
-  // ===============================
   onlineUsers++;
   io.emit("onlineCount", onlineUsers);
 
@@ -53,14 +42,24 @@ io.on("connection", (socket) => {
   // 🔥 REGISTER USERNAME
   // ===============================
   socket.on("registerUser", (username) => {
+    if (!username) return;
+
     connectedUsers[socket.id] = username;
     socket.username = username;
+
+    console.log("REGISTERED:", username);
   });
 
-  socket.on("registerUser", (username) => {
-  connectedUsers[socket.id] = username;
-  console.log("REGISTER:", username);
-});
+  // ===============================
+  // 🔥 REGISTER TELEGRAM
+  // ===============================
+  socket.on("registerTelegram", (data) => {
+    if (!data.username || !data.chatId) return;
+
+    telegramUsers[data.username.toLowerCase()] = data.chatId;
+
+    console.log("TELEGRAM REGISTER:", data.username);
+  });
 
   // ===============================
   // 🔥 TYPING
@@ -77,6 +76,8 @@ io.on("connection", (socket) => {
   // 🔥 CHAT MESSAGE
   // ===============================
   socket.on("chatMessage", async (data) => {
+
+    if (!data.message || !data.username) return;
 
     const time = new Date().toLocaleTimeString("id-ID", {
       timeZone: "Asia/Jakarta",
@@ -97,43 +98,52 @@ io.on("connection", (socket) => {
     io.emit("chatMessage", newMessage);
 
     // ===============================
-    // 🔥 CEK MENTION @username
+    // 🔥 DETECT MENTION (ANTI GAGAL)
     // ===============================
-    const words = data.message.split(" ");
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+    let match;
 
-    for (let word of words) {
-      if (word.startsWith("@")) {
+    while ((match = mentionRegex.exec(data.message)) !== null) {
 
-        const mentionedName = word.substring(1);
+      const mentionedName = match[1].toLowerCase();
 
-        // 🔹 Notif Web (kalau online)
-        for (let id in connectedUsers) {
-          if (connectedUsers[id] === mentionedName) {
-            io.to(id).emit("mentioned", {
-              from: data.username
-            });
-          }
+      console.log("DETECTED MENTION:", mentionedName);
+      console.log("CONNECTED USERS:", connectedUsers);
+
+      // 🔹 WEB NOTIF
+      for (let id in connectedUsers) {
+        const onlineUser = connectedUsers[id];
+
+        if (
+          onlineUser &&
+          onlineUser.toLowerCase() === mentionedName
+        ) {
+          console.log("SENDING WEB NOTIF TO:", onlineUser);
+
+          io.to(id).emit("mentioned", {
+            from: data.username
+          });
         }
-
-        console.log("CONNECTED USERS:", connectedUsers);
-console.log("MENTIONED:", mentionedName);
-
-        // 🔹 Notif Telegram (walau web tutup)
-        if (telegramUsers[mentionedName]) {
-          try {
-            await axios.post(
-              `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
-              {
-                chat_id: telegramUsers[mentionedName],
-                text: `🔥 Kamu di-mention oleh ${data.username}\n\nPesan:\n"${data.message}"`
-              }
-            );
-          } catch (err) {
-            console.log("Telegram error:", err.message);
-          }
-        }
-
       }
+
+      // 🔹 TELEGRAM NOTIF
+      if (telegramUsers[mentionedName]) {
+        try {
+          console.log("SENDING TELEGRAM NOTIF TO:", mentionedName);
+
+          await axios.post(
+            `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
+            {
+              chat_id: telegramUsers[mentionedName],
+              text: `🔥 Kamu di-mention oleh ${data.username}\n\nPesan:\n"${data.message}"`
+            }
+          );
+
+        } catch (err) {
+          console.log("TELEGRAM ERROR:", err.message);
+        }
+      }
+
     }
 
   });
@@ -152,14 +162,14 @@ console.log("MENTIONED:", mentionedName);
   // ===============================
   socket.on("disconnect", () => {
     delete connectedUsers[socket.id];
+
     onlineUsers--;
     io.emit("onlineCount", onlineUsers);
   });
 
 });
 
-// ===============================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("🚀 Server running on port " + PORT);
 });
